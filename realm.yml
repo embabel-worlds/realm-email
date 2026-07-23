@@ -1,5 +1,5 @@
 name: email
-description: "Abstract-inbox pack — declares the `email.thread` DomainType and the attention-worthiness rules (deterministic and LLM-judged) that operate on it. Provider-agnostic: any inbox integration (in-tree Gmail today, future pack-exchange / pack-imap) whose signals satisfy `email.thread` benefits from these rules without per-provider duplication."
+description: "Abstract-inbox realm — declares the `email.thread` DomainType and the attention-worthiness rules (deterministic and LLM-judged) that operate on it. Provider-agnostic: any inbox integration (in-tree Gmail today, future realm-exchange / realm-imap) whose signals satisfy `email.thread` benefits from these rules without per-provider duplication."
 version: 0.1.0
 author: Rod Johnson
 url: https://github.com/johnsonr/realm-email
