@@ -14,7 +14,7 @@ description: Judge whether an email thread warrants attention (without sender co
 inputTypeNames:
   - email.thread
 
-outputTypeName: com.embabel.assistant.consequence.AttentionVerdict
+outputTypeName: com.embabel.world.consequence.AttentionVerdict
 nullable: true
 
 # Don't even run on emails that the initial-triage GOAP action

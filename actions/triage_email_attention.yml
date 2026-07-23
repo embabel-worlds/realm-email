@@ -24,7 +24,7 @@ inputTypeNames:
   - email.thread
   - PersonContext
 
-outputTypeName: com.embabel.assistant.consequence.AttentionVerdict
+outputTypeName: com.embabel.world.consequence.AttentionVerdict
 nullable: true
 
 # Don't even run on emails that the initial-triage GOAP action

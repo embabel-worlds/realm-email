@@ -8,7 +8,7 @@
 # Provider-agnostic: fires for Gmail, Exchange, IMAP — any inbox whose
 # producer emits signals satisfying `email.thread`.
 
-stepType: com.embabel.assistant.policy.spec.PolicyActionSpec
+stepType: com.embabel.world.policy.spec.PolicyActionSpec
 name: email_unreplied
 description: A thread you're a participant in has activity from someone else, ≥ 24h ago
 

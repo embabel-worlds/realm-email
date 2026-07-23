@@ -19,7 +19,7 @@ description: Judge whether an upcoming meeting warrants the user's attention
 inputTypeNames:
   - calendar.meeting
 
-outputTypeName: com.embabel.assistant.consequence.AttentionVerdict
+outputTypeName: com.embabel.world.consequence.AttentionVerdict
 nullable: true
 
 prompt: |
