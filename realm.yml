@@ -3,6 +3,7 @@ description: "Abstract-inbox realm — declares the `email.thread` DomainType an
 version: 0.1.0
 author: Rod Johnson
 url: https://github.com/johnsonr/realm-email
+category: productivity
 tags:
   - email
   - inbox
