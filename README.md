@@ -18,6 +18,26 @@ duplication.
 - `actions/triage_email_attention.yaml` — LLM-judged second-look
   (`stepType: triage`). Runs only when no deterministic policy matched
   the signal; the planner's GOAP composition handles the escalation.
+- `views/correspondents.yml` — who you write to, over the host's
+  `(:AssistantUser)-[:EMAILED]->(:Person)` edge: `my_correspondents`,
+  `recent_correspondents`, `mv_correspondents` (materialised) and
+  `top_correspondents` (organizations ranked by inbound volume).
+- `views/memory.yml` — what the assistant has learned about you, over the
+  host's `:Proposition` memory: `my_memories`, `recent_memories`,
+  `stale_memories`, `memories_about_person` and
+  `memories_about_organization`. Every view runs on its defaults; the two
+  about-views read a blank name as "memories about anyone".
+
+### Why the views live in this realm
+
+Neither `EMAILED` nor `:Proposition` is declared by a realm: both are
+written by the host, and both are in a world's schema only once there is
+data behind them. In a world with no mail, the host withholds `EMAILED`
+and has written no propositions, so these views are refused before they
+run. A connected inbox is what brings both — mail ingestion writes the
+correspondence edges and extracts propositions from the threads it keeps
+— so the views ship with the inbox realm and are listed where they can
+answer, not in every world.
 
 ## What's not in here (deliberately)
 

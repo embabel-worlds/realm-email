@@ -1,0 +1,112 @@
+# MEMORY views — the assistant's own long-term memory (DICE propositions: durable facts it has
+# learned about you) as parameterized views, so the Cypher Console and kg_query can answer "what do
+# you know about …" structurally. Each body is `MATCH … [WHERE …] RETURN <singleNodeVar>`, so its
+# rows ARE :Proposition nodes.
+#
+# WHY THEY SHIP HERE. :Proposition is curated by the host, not declared by any realm, and it is in
+# a world's schema only once the host has written propositions there. On a fresh world it has
+# written none, so these views are refused before they run. A connected inbox is what fills it from
+# the first day: mail ingestion writes propositions alongside the EMAILED edges the correspondent
+# views read. So they ship with the inbox, beside those views, rather than failing for every new
+# owner of a world that has no mail.
+#
+# Privacy and curation are enforced by the scope rewriter on the EXPANDED body, not by these
+# queries: results are always the acting user's own memories, ACTIVE facts only unless a view
+# names another status, and known-false (CONTRADICTED) rows can never be returned by any of them.
+
+- name: my_memories
+  description: "What the assistant remembers about you — newest first, with an optional text filter."
+  params:
+    contains:
+      type: string
+      default: ""
+      description: "Only memories whose text contains this (case-insensitive)."
+    limit:
+      type: int
+      default: 25
+      description: "Maximum memories to return."
+  cypher: |
+    MATCH (p:Proposition)
+    WHERE $contains = '' OR toLower(p.text) CONTAINS toLower($contains)
+    WITH p ORDER BY p.created DESC LIMIT $limit RETURN p
+
+- name: recent_memories
+  description: "Memories learned in the last N days, newest first."
+  params:
+    days:
+      type: int
+      default: 30
+      description: "How many days back to look."
+    limit:
+      type: int
+      default: 25
+      description: "Maximum memories to return."
+  cypher: |
+    MATCH (p:Proposition)
+    WHERE p.created >= datetime() - duration({days: $days})
+    WITH p ORDER BY p.created DESC LIMIT $limit RETURN p
+
+# The about-views match BOTH mention surfaces. Most memories name the entity only in their TEXT
+# (plus an unresolved :Mention satellite) — resolved MENTIONS edges are the minority — so
+# text-contains is the high-recall arm; the EXISTS arm adds memories whose text never names the
+# entity but whose mention was resolved to the canonical node.
+#
+# A BLANK NAME IS A QUESTION TOO: "what do you know about the people in my life". It switches the
+# text arm off — every text contains the empty string, so it would return every memory — and
+# leaves the resolved arm, which then matches any memory resolved to a person (or organization).
+# So the views run on their defaults and answer something true rather than refusing for want of
+# an argument.
+#
+# They include STALE explicitly (a recall surface: a decayed fact — "X works for Y" learned a year
+# ago — is usually still what the user is asking for). SUPERSEDED is excluded (a better version
+# exists and is the ACTIVE row); CONTRADICTED can never be returned regardless. ACTIVE facts sort
+# first.
+- name: memories_about_person
+  description: "Memories that mention a person — 'what do you know about <name>'. Blank name: memories resolved to any person. Includes decayed (stale) facts, current first."
+  params:
+    name:
+      type: string
+      default: ""
+      description: "The person's name, or part of it (case-insensitive). Blank for memories about anyone."
+    limit:
+      type: int
+      default: 25
+      description: "Maximum memories to return."
+  cypher: |
+    MATCH (p:Proposition)
+    WHERE p.status IN ['ACTIVE', 'STALE']
+      AND (($name <> '' AND toLower(p.text) CONTAINS toLower($name))
+       OR EXISTS { MATCH (p)-[:MENTIONS]->(e:Person) WHERE toLower(e.name) CONTAINS toLower($name) })
+    WITH p ORDER BY CASE p.status WHEN 'ACTIVE' THEN 0 ELSE 1 END, p.created DESC LIMIT $limit
+    RETURN p
+
+- name: memories_about_organization
+  description: "Memories that mention an organization — 'what do you know about <company>'. Blank name: memories resolved to any organization. Includes decayed (stale) facts, current first."
+  params:
+    name:
+      type: string
+      default: ""
+      description: "The organization's name, or part of it (case-insensitive). Blank for memories about any organization."
+    limit:
+      type: int
+      default: 25
+      description: "Maximum memories to return."
+  cypher: |
+    MATCH (p:Proposition)
+    WHERE p.status IN ['ACTIVE', 'STALE']
+      AND (($name <> '' AND toLower(p.text) CONTAINS toLower($name))
+       OR EXISTS { MATCH (p)-[:MENTIONS]->(e:Organization) WHERE toLower(e.name) CONTAINS toLower($name) })
+    WITH p ORDER BY CASE p.status WHEN 'ACTIVE' THEN 0 ELSE 1 END, p.created DESC LIMIT $limit
+    RETURN p
+
+- name: stale_memories
+  description: "Outdated memories the assistant no longer relies on — an audit view. Known-false (contradicted) memories are never shown."
+  params:
+    limit:
+      type: int
+      default: 25
+      description: "Maximum memories to return."
+  cypher: |
+    MATCH (p:Proposition)
+    WHERE p.status = 'STALE'
+    WITH p ORDER BY p.created DESC LIMIT $limit RETURN p
