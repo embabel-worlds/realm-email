@@ -1,0 +1,74 @@
+# CORRESPONDENT views — who you write to, read off the inbox's own correspondence edge.
+#
+# WHY THEY SHIP HERE AND NOT IN EVERY WORLD. Every body below reads
+# (:AssistantUser)-[:EMAILED]->(:Person), an edge the host writes from an ingested mailbox. A
+# world without mail has no such edge, and the host withholds it from the schema, so in such a
+# world these views are refused before they run. Shipped with every world, they would fail for
+# every new owner; shipped with the inbox, they are listed where the edge can exist.
+#
+# `(me:AssistantUser)` is NAMED in each body so the scope rewriter binds it to the acting user;
+# another user's correspondence never leaks.
+
+# SUBSET views: `MATCH … [WHERE …] RETURN <singleNodeVar>`, so the rows ARE Person nodes and the
+# name composes as a label:
+#   MATCH (p:my_correspondents)-[:WORKS_FOR]->(o:Organization) RETURN o.name
+# expands to
+#   CALL { MATCH (me:AssistantUser)-[:EMAILED]->(p:Person) RETURN p AS p } MATCH (p)-[:WORKS_FOR]->(o) RETURN o.name
+- name: my_correspondents
+  description: "People you have emailed — a subset of Person."
+  cypher: |
+    MATCH (me:AssistantUser)-[:EMAILED]->(p:Person) RETURN p
+
+# A PARAMETERIZED view: referenced bare it runs with the defaults; an inline map on the label
+# supplies overrides — MATCH (p:recent_correspondents {limit: 3}) RETURN p.name.
+- name: recent_correspondents
+  description: "People you have emailed, MOST RECENT FIRST (by the last message either way), capped."
+  params:
+    limit:
+      type: int
+      default: 5
+      description: "Maximum people to return."
+    nameContains:
+      type: string
+      default: ""
+      description: "Only people whose name contains this text."
+  # ORDER BY IS NOT OPTIONAL IN A VIEW NAMED "recent_*": without it the view returns an arbitrary
+  # slice while its name promises recency, and a model that routes "who have I emailed most
+  # recently?" here — correctly — relays the wrong person.
+  #
+  # Ordered on the EMAILED edge's `lastAt`, the authoritative timestamp. Never on a decorated
+  # `p.lastInteractionDays`: that stores a time-RELATIVE value as a snapshot, so it is stale the day
+  # after it is written. Never sort by a stored "days ago".
+  cypher: |
+    MATCH (me:AssistantUser)-[e:EMAILED]->(p:Person)
+    WHERE $nameContains = '' OR toLower(p.name) CONTAINS toLower($nameContains)
+    WITH p, e.lastAt AS lastAt ORDER BY lastAt DESC
+    WITH p LIMIT $limit RETURN p
+
+# A MATERIALISED view: its result nodes are cached and a reference reads the cache instead of
+# re-running the body until the TTL expires. The output label is required — the cache binds the
+# members off the MEMBER set and the scope rewriter needs a label on that variable.
+- name: mv_correspondents
+  description: "Cached people you have emailed (materialised, refreshed hourly)."
+  materialized: true
+  ttl: 1h
+  outputLabel: Person
+  cypher: |
+    MATCH (me:AssistantUser)-[:EMAILED]->(p:Person) RETURN p
+
+# A TABULAR aggregate, report-only. It PINS the "who contacts me most" aggregation: the count is
+# done once, inside the view, so no caller can fan out the join and over-count, and every model,
+# app and console that runs it by name gets the same ranking.
+- name: top_correspondents
+  description: "Organizations that email you most, ranked by inbound volume (deduped, no fan-out). Rows: {org, inbound, people}."
+  params:
+    limit:
+      type: int
+      default: 10
+      description: "Maximum organizations to return."
+  cypher: |
+    MATCH (me:AssistantUser)-[e:EMAILED]->(p:Person)-[:WORKS_FOR]->(o:Organization)
+    WITH o, sum(e.receivedCount) AS inbound, count(DISTINCT p) AS people
+    RETURN o.name AS org, inbound, people
+    ORDER BY inbound DESC, org ASC
+    LIMIT $limit
